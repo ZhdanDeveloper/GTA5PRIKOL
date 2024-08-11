@@ -7,6 +7,8 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using OpenCvSharp;
 using OpenCvSharp.Extensions;
+using Tesseract;
+using System.Diagnostics;
 
 
 
@@ -238,7 +240,7 @@ class Program
     static void Main()
     {
 
-
+        start:
         KeyPresser keyPresser = new KeyPresser();
         // Примерные координаты и размеры области шкалы
         int x = 650;  // Начальная координата x (примерно 650 пикселей от левого края)
@@ -345,7 +347,7 @@ class Program
                     presser.PressSpace();
                     Console.Beep();
                     traaack();
-                    SaveScreenshot(currentScreenshot, x, y);
+                    //SaveScreenshot(currentScreenshot, x, y);
                     previousScreenshot.Dispose();
                     previousScreenshot = new Bitmap(currentScreenshot); // Сохраняем текущее состояние как предыдущее
                     while (true) { }
@@ -360,12 +362,12 @@ class Program
         }
 
     }
-    private static void SaveScreenshot(Bitmap bmp, int x, int y)
-    {
-        string filename = $"changed_square_{x}_{y}_{DateTime.Now:yyyyMMdd_HHmmss}.png";
-        bmp.Save(filename, ImageFormat.Png);
-        Console.WriteLine($"Скриншот сохранен: {filename}");
-    }
+    //private static void SaveScreenshot(Bitmap bmp, int x, int y)
+    //{
+    //    string filename = $"changed_square_{x}_{y}_{DateTime.Now:yyyyMMdd_HHmmss}.png";
+    //    bmp.Save(filename, ImageFormat.Png);
+    //    Console.WriteLine($"Скриншот сохранен: {filename}");
+    //}
     private static bool ImagesAreDifferent(Bitmap bmp1, Bitmap bmp2)
     {
         for (int i = 0; i < bmp1.Width; i++)
@@ -394,6 +396,8 @@ class Program
         KeyPresser keyPresser = new KeyPresser();
         Rectangle screenArea = new Rectangle(0, 0, 1920, 1080); // разрешение экрана
         Bitmap previousTRACKScreenshot = null;
+        Stopwatch stopwatch = new Stopwatch();
+        stopwatch.Start();
 
         while (true)
         {
@@ -444,6 +448,16 @@ class Program
                     Console.WriteLine("right");
                     Console.Beep(500, 500);
                 }
+                if (stopwatch.Elapsed.TotalSeconds >= 65 )
+                {
+                    checkEND();
+
+                }
+                if (stopwatch.Elapsed.TotalSeconds >= 85)
+                {
+                    Main();
+
+                }
             }
 
             // Сохраняем текущий кадр как предыдущий
@@ -466,6 +480,84 @@ class Program
             }
             return bmp;
         }
+
+
+        static void checkEND()
+        {
+            Bitmap screenshotBmp = CaptureFINISHScreenshot();
+
+            // Поиск текста на скриншоте
+            string recognizedText = RecognizeText(screenshotBmp);
+
+            // Проверка наличия текста "Забрать себе"
+            if (recognizedText.Contains("Забрать себе"))
+            {
+                Console.WriteLine("found");
+                Main();
+            }
+            if (recognizedText.Contains("Рыба сорвалась"))
+            {
+                Console.WriteLine("found");
+                Main();
+            }
+            else
+            {
+                Console.WriteLine("not found");
+            }
+
+            // Задержка
+            //Thread.Sleep(delayMilliseconds);
+
+            // Освобождение ресурсов
+            screenshotBmp.Dispose();
+        }
+
+
+
+
+
+        static Bitmap CaptureFINISHScreenshot()
+        {
+            int screenWidth = 1920;  // Ваше разрешение экрана
+            int screenHeight = 1080; // Ваше разрешение экрана
+            Bitmap bitmap = new Bitmap(screenWidth, screenHeight);
+            using (Graphics g = Graphics.FromImage(bitmap))
+            {
+                g.CopyFromScreen(0, 0, 0, 0, bitmap.Size);
+            }
+            return bitmap;
+        }
+
+        static string RecognizeText(Bitmap image)
+        {
+            string tessDataPath = @".\testdata"; // Убедитесь, что путь к tessdata указан правильно
+            using var engine = new TesseractEngine(tessDataPath, "rus", EngineMode.Default);
+
+            // Конвертация Bitmap в Pix
+            using var img = ConvertBitmapToPix(image);
+            using var page = engine.Process(img);
+            return page.GetText();
+        }
+
+        static Pix ConvertBitmapToPix(Bitmap bitmap)
+        {
+            // Сохранение Bitmap в поток памяти как изображение BMP
+            using var stream = new MemoryStream();
+            bitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Bmp);
+            stream.Position = 0;
+
+            // Конвертация потока в Pix с помощью Tesseract
+            return Pix.LoadFromMemory(stream.ToArray());
+        }
+
+        static Mat BitmapToMat(Bitmap bitmap)
+        {
+            // Конвертируем Bitmap в OpenCvSharp.Mat
+            return BitmapConverter.ToMat(bitmap);
+        }
+
+    
+
 
         static System.Drawing.Point CalculateMovement(Mat previousFrame, Mat currentFrame)
         {
