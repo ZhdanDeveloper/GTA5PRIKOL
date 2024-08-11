@@ -559,20 +559,61 @@ class Program
     
 
 
+        //static System.Drawing.Point CalculateMovement(Mat previousFrame, Mat currentFrame)
+        //{
+        //    // Простой пример: сравнение разницы пикселей по оси X
+        //    Mat grayPrev = new Mat();
+        //    Mat grayCurr = new Mat();
+
+        //    Cv2.CvtColor(previousFrame, grayPrev, ColorConversionCodes.BGR2GRAY);
+        //    Cv2.CvtColor(currentFrame, grayCurr, ColorConversionCodes.BGR2GRAY);
+
+        //    // Используем функцию для поиска смещения
+        //    Mat flow = new Mat();
+        //    Cv2.CalcOpticalFlowFarneback(grayPrev, grayCurr, flow, 0.5, 3, 15, 3, 5, 1.2, 0);
+
+        //    // Усредняем смещение по всему изображению
+        //    System.Drawing.Point movement = new System.Drawing.Point(0, 0);
+        //    for (int y = 0; y < flow.Rows; y++)
+        //    {
+        //        for (int x = 0; x < flow.Cols; x++)
+        //        {
+        //            Vec2f flowAtPoint = flow.At<Vec2f>(y, x);
+        //            movement.X += (int)flowAtPoint[0];
+        //            movement.Y += (int)flowAtPoint[1];
+        //        }
+        //    }
+
+        //    // Нормализуем движение
+        //    movement.X /= flow.Rows * flow.Cols;
+        //    movement.Y /= flow.Rows * flow.Cols;
+
+        //    return movement;
+        //}
+
+
+        //night mod
         static System.Drawing.Point CalculateMovement(Mat previousFrame, Mat currentFrame)
         {
-            // Простой пример: сравнение разницы пикселей по оси X
+            // Преобразуем в серый цвет
             Mat grayPrev = new Mat();
             Mat grayCurr = new Mat();
-
             Cv2.CvtColor(previousFrame, grayPrev, ColorConversionCodes.BGR2GRAY);
             Cv2.CvtColor(currentFrame, grayCurr, ColorConversionCodes.BGR2GRAY);
 
-            // Используем функцию для поиска смещения
-            Mat flow = new Mat();
-            Cv2.CalcOpticalFlowFarneback(grayPrev, grayCurr, flow, 0.5, 3, 15, 3, 5, 1.2, 0);
+            // Применяем выравнивание гистограммы
+            Cv2.EqualizeHist(grayPrev, grayPrev);
+            Cv2.EqualizeHist(grayCurr, grayCurr);
 
-            // Усредняем смещение по всему изображению
+            // Применяем фильтр Гаусса для сглаживания
+            Cv2.GaussianBlur(grayPrev, grayPrev, new OpenCvSharp.Size(5, 5), 0);
+            Cv2.GaussianBlur(grayCurr, grayCurr, new OpenCvSharp.Size(5, 5), 0);
+
+            // Вычисляем оптический поток
+            Mat flow = new Mat();
+            Cv2.CalcOpticalFlowFarneback(grayPrev, grayCurr, flow, 0.5, 3, 15, 3, 7, 1.5, 0);
+
+            // Анализируем смещение центра
             System.Drawing.Point movement = new System.Drawing.Point(0, 0);
             for (int y = 0; y < flow.Rows; y++)
             {
@@ -589,6 +630,13 @@ class Program
             movement.Y /= flow.Rows * flow.Cols;
 
             return movement;
+        }
+
+
+        static void SaveImage(Mat image, string filename)
+        {
+            image.SaveImage(filename);
+            Console.WriteLine($"saved: {filename}");
         }
     }
 }
