@@ -3,15 +3,11 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Threading;
-using System.Drawing;
-using System.Drawing.Imaging;
 using OpenCvSharp;
 using OpenCvSharp.Extensions;
-using Tesseract;
 using System.Diagnostics;
-
-
-
+using Tesseract;
+using System.Text;
 
 public class KeyPresser
 {
@@ -189,18 +185,18 @@ public class KeyPresser
     {
         INPUT[] inputs = new INPUT[]
         {
-        new INPUT
-        {
-            type = INPUT_KEYBOARD,
-            u = new InputUnion
+            new INPUT
             {
-                ki = new KEYBDINPUT
+                type = INPUT_KEYBOARD,
+                u = new InputUnion
                 {
-                    wScan = scanCode,
-                    dwFlags = 0x0008 // KEYEVENTF_SCANCODE
+                    ki = new KEYBDINPUT
+                    {
+                        wScan = scanCode,
+                        dwFlags = 0x0008 // KEYEVENTF_SCANCODE
+                    }
                 }
             }
-        }
         };
 
         SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(INPUT)));
@@ -210,18 +206,18 @@ public class KeyPresser
     {
         INPUT[] inputs = new INPUT[]
         {
-        new INPUT
-        {
-            type = INPUT_KEYBOARD,
-            u = new InputUnion
+            new INPUT
             {
-                ki = new KEYBDINPUT
+                type = INPUT_KEYBOARD,
+                u = new InputUnion
                 {
-                    wScan = scanCode,
-                    dwFlags = 0x0008 | 0x0002 // KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP
+                    ki = new KEYBDINPUT
+                    {
+                        wScan = scanCode,
+                        dwFlags = 0x0008 | 0x0002 // KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP
+                    }
                 }
             }
-        }
         };
 
         SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(INPUT)));
@@ -237,11 +233,90 @@ class Program
     static readonly int moveThreshold = 1; // Minimum movement threshold for detecting direction
     static bool isAHeld = false;
     static bool isDHeld = false;
+    static bool isDay = true;
+    static int isHunter = 880;
+    int selectedIndex = 0;
+    static bool firstTime = true;
+
     static void Main()
     {
-
-        start:
         KeyPresser keyPresser = new KeyPresser();
+        string[] tine_of_day = { "День", "Ночь" };
+        string[] kind_of_fish = { "Хищная", "не хищная" };
+        int selectedIndex = 0;
+        Console.OutputEncoding = Encoding.UTF8;
+        Console.InputEncoding = Encoding.UTF8;
+
+        ConsoleKey key;
+
+        if (firstTime == true)
+        {
+            do
+            {
+                Console.Clear();
+                Console.WriteLine("Время суток :");
+
+                DisplayMenu(tine_of_day, selectedIndex);
+
+                key = Console.ReadKey(true).Key;
+
+                switch (key)
+                {
+                    case ConsoleKey.UpArrow:
+                        selectedIndex = (selectedIndex == 0) ? tine_of_day.Length - 1 : selectedIndex - 1;
+                        break;
+                    case ConsoleKey.DownArrow:
+                        selectedIndex = (selectedIndex == tine_of_day.Length - 1) ? 0 : selectedIndex + 1;
+                        break;
+                    case ConsoleKey.Enter:
+                        ExecuteOptionTime(selectedIndex);
+                        break;
+                }
+
+            } while (key != ConsoleKey.Enter);
+
+            Console.Clear();
+            selectedIndex = 0;
+            do
+            {
+                Console.Clear();
+                Console.WriteLine("Тип рыбы :");
+
+                DisplayMenu(kind_of_fish, selectedIndex);
+
+                key = Console.ReadKey(true).Key;
+
+                switch (key)
+                {
+                    case ConsoleKey.UpArrow:
+                        selectedIndex = (selectedIndex == 0) ? kind_of_fish.Length - 1 : selectedIndex - 1;
+                        break;
+                    case ConsoleKey.DownArrow:
+                        selectedIndex = (selectedIndex == kind_of_fish.Length - 1) ? 0 : selectedIndex + 1;
+                        break;
+                    case ConsoleKey.Enter:
+                        ExecuteOptionKindOFish(selectedIndex);
+                        break;
+                }
+
+            } while (key != ConsoleKey.Enter);
+
+
+
+            Console.WriteLine("Примечание: бот ловит рыбу 85 секунд, если он не успевает то прекращает тянуть рыбу и ждет нового заброса, если рыба поймана просто ждите и удочка закинеться автоматически");
+            Console.WriteLine();
+            Console.WriteLine("Нажмите любую кнопку чтоб начать...");
+            Console.ReadKey();
+            Console.Clear();
+            Console.WriteLine("Бот работает, откройте ГТА и забросьте удочку");
+        }
+
+
+        firstTime = false;
+
+        
+
+
         // Примерные координаты и размеры области шкалы
         int x = 650;  // Начальная координата x (примерно 650 пикселей от левого края)
         int y = 896;  // Начальная координата y (примерно 960 пикселей от верхнего края)
@@ -290,25 +365,19 @@ class Program
 
                     // Проверка на уменьшение зеленой зоны
                     if (previousGreenZoneWidth > 0 && currentGreenZoneWidth < previousGreenZoneWidth)
-                    {        
-
+                    {
                         Console.WriteLine($"detect");
                         gotoinf(keyPresser);
                         frameCount++;
-
                     }
 
                     // Обновляем ширину зеленой зоны
                     previousGreenZoneWidth = currentGreenZoneWidth;
                 }
-                else
-                {
-                    //Console.WriteLine("Зеленая зона не найдена.");
-                }
-
             }
         }
     }
+
     static void gotoinf(KeyPresser x)
     {
         Console.Beep();
@@ -317,14 +386,13 @@ class Program
         CaptureScreenshotAroundPoint(1394, 880, 25, 25, x);
 
         while (true) { }
-
     }
-
 
     public static void CaptureScreenshotAroundPoint(int x, int y, int width, int height, KeyPresser presser)
     {
-
         Bitmap previousScreenshot = null;
+
+        y = isHunter;
 
         while (true)
         {
@@ -347,10 +415,8 @@ class Program
                     presser.PressSpace();
                     Console.Beep();
                     traaack();
-                    //SaveScreenshot(currentScreenshot, x, y);
                     previousScreenshot.Dispose();
                     previousScreenshot = new Bitmap(currentScreenshot); // Сохраняем текущее состояние как предыдущее
-                    while (true) { }
                 }
                 else
                 {
@@ -360,14 +426,8 @@ class Program
                 Thread.Sleep(1000); // Задержка 1 секунда между проверками
             }
         }
-
     }
-    //private static void SaveScreenshot(Bitmap bmp, int x, int y)
-    //{
-    //    string filename = $"changed_square_{x}_{y}_{DateTime.Now:yyyyMMdd_HHmmss}.png";
-    //    bmp.Save(filename, ImageFormat.Png);
-    //    Console.WriteLine($"Скриншот сохранен: {filename}");
-    //}
+
     private static bool ImagesAreDifferent(Bitmap bmp1, Bitmap bmp2)
     {
         for (int i = 0; i < bmp1.Width; i++)
@@ -390,7 +450,6 @@ class Program
         return pixelColor.G > 150 && pixelColor.R < 100 && pixelColor.B < 100;
     }
 
-
     static void traaack()
     {
         KeyPresser keyPresser = new KeyPresser();
@@ -407,9 +466,6 @@ class Program
             // Преобразуем в формат Mat для OpenCV
             Mat currentFrame = BitmapConverter.ToMat(currentScreenshot);
 
-            // Находим центр текущего изображения
-            System.Drawing.Point currentCenter = new System.Drawing.Point(currentFrame.Width / 2, currentFrame.Height / 2);
-
             if (previousTRACKScreenshot != null)
             {
                 // Преобразуем предыдущий кадр в формат Mat
@@ -420,7 +476,17 @@ class Program
                 Cv2.Absdiff(previousFrame, currentFrame, diff);
 
                 // Анализируем смещение центра
-                System.Drawing.Point movement = CalculateMovement(previousFrame, currentFrame);
+
+                System.Drawing.Point movement;
+
+                if (isDay == true)
+                {
+                    movement = CalculateMovement(previousFrame, currentFrame);
+                }
+                else
+                {
+                    movement = CalculateMovementNight(previousFrame, currentFrame);
+                }
 
                 if (movement.X > 0 && !isDHeld)
                 {
@@ -448,15 +514,15 @@ class Program
                     Console.WriteLine("right");
                     Console.Beep(500, 500);
                 }
-                if (stopwatch.Elapsed.TotalSeconds >= 65 )
+
+                if (stopwatch.Elapsed.TotalSeconds >= 65)
                 {
                     checkEND();
-
                 }
+
                 if (stopwatch.Elapsed.TotalSeconds >= 85)
                 {
                     Main();
-
                 }
             }
 
@@ -466,178 +532,273 @@ class Program
                 previousTRACKScreenshot.Dispose();
             }
             previousTRACKScreenshot = currentScreenshot;
+        }
+    }
 
-            // Задержка для обновления кадров (например, 100ms)
-            //System.Threading.Thread.Sleep(0);
+    static Bitmap CaptureScreen(Rectangle area)
+    {
+        Bitmap bmp = new Bitmap(area.Width, area.Height, PixelFormat.Format32bppArgb);
+        using (Graphics g = Graphics.FromImage(bmp))
+        {
+            g.CopyFromScreen(area.Left, area.Top, 0, 0, bmp.Size, CopyPixelOperation.SourceCopy);
+        }
+        return bmp;
+    }
+
+    static void checkEND()
+    {
+        Bitmap screenshotBmp = CaptureFINISHScreenshot();
+
+        // Поиск текста на скриншоте
+        string recognizedText = RecognizeText(screenshotBmp);
+
+        // Проверка наличия текста "Забрать себе"
+        if (recognizedText.Contains("Забрать себе"))
+        {
+            Console.WriteLine("found");
+            Main();
         }
 
-        static Bitmap CaptureScreen(Rectangle area)
+        if (recognizedText.Contains("Рыба сорвалась"))
         {
-            Bitmap bmp = new Bitmap(area.Width, area.Height, PixelFormat.Format32bppArgb);
-            using (Graphics g = Graphics.FromImage(bmp))
-            {
-                g.CopyFromScreen(area.Left, area.Top, 0, 0, bmp.Size, CopyPixelOperation.SourceCopy);
-            }
-            return bmp;
+            Console.WriteLine("found");
+            Main();
+        }
+        else
+        {
+            Console.WriteLine("not found");
         }
 
+        // Освобождение ресурсов
+        screenshotBmp.Dispose();
+    }
 
-        static void checkEND()
+    static Bitmap CaptureFINISHScreenshot()
+    {
+        int screenWidth = 1920;  // Ваше разрешение экрана
+        int screenHeight = 1080; // Ваше разрешение экрана
+        Bitmap bitmap = new Bitmap(screenWidth, screenHeight);
+        using (Graphics g = Graphics.FromImage(bitmap))
         {
-            Bitmap screenshotBmp = CaptureFINISHScreenshot();
+            g.CopyFromScreen(0, 0, 0, 0, bitmap.Size);
+        }
+        return bitmap;
+    }
 
-            // Поиск текста на скриншоте
-            string recognizedText = RecognizeText(screenshotBmp);
+    static string RecognizeText(Bitmap image)
+    {
+        string tessDataPath = @".\testdata"; // Убедитесь, что путь к tessdata указан правильно
+        using var engine = new TesseractEngine(tessDataPath, "rus", EngineMode.Default);
 
-            // Проверка наличия текста "Забрать себе"
-            if (recognizedText.Contains("Забрать себе"))
+        // Конвертация Bitmap в Pix
+        using var img = ConvertBitmapToPix(image);
+        using var page = engine.Process(img);
+        return page.GetText();
+    }
+
+    static Pix ConvertBitmapToPix(Bitmap bitmap)
+    {
+        // Сохранение Bitmap в поток памяти как изображение BMP
+        using var stream = new MemoryStream();
+        bitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Bmp);
+        stream.Position = 0;
+
+        // Конвертация потока в Pix с помощью Tesseract
+        return Pix.LoadFromMemory(stream.ToArray());
+    }
+
+
+    // night
+    static System.Drawing.Point CalculateMovement(Mat previousFrame, Mat currentFrame)
+    {
+        // Преобразуем в серый цвет для обоих кадров
+        Mat grayPrev = new Mat();
+        Mat grayCurr = new Mat();
+        Cv2.CvtColor(previousFrame, grayPrev, ColorConversionCodes.BGR2GRAY);
+        Cv2.CvtColor(currentFrame, grayCurr, ColorConversionCodes.BGR2GRAY);
+
+        // Применяем выравнивание гистограммы для улучшения контраста
+        Cv2.EqualizeHist(grayPrev, grayPrev);
+        Cv2.EqualizeHist(grayCurr, grayCurr);
+
+        // Применяем фильтр Гаусса для сглаживания и уменьшения шума
+        Cv2.GaussianBlur(grayPrev, grayPrev, new OpenCvSharp.Size(3, 3), 0);
+        Cv2.GaussianBlur(grayCurr, grayCurr, new OpenCvSharp.Size(3, 3), 0);
+
+        // Настройка параметров для усиления детекции
+        Mat flow = new Mat();
+        Cv2.CalcOpticalFlowFarneback(
+            grayPrev,
+            grayCurr,
+            flow,
+            0.3,  // уменьшаем масштаб пирамиды для повышения чувствительности
+            5,    // увеличиваем количество уровней пирамиды
+            15,   // уменьшаем размер окна
+            3,    // количество итераций алгоритма для каждого уровня пирамиды
+            7,    // увеличиваем количество пикселей для усреднения
+            1.5,  // вес усреднения
+            0     // флаги
+        );
+
+        // Анализируем смещение по оси X (влево/вправо)
+        System.Drawing.Point totalMovement = new System.Drawing.Point(0, 0);
+        for (int y = 0; y < flow.Rows; y++)
+        {
+            for (int x = 0; x < flow.Cols; x++)
             {
-                Console.WriteLine("found");
-                Main();
+                Vec2f flowAtPoint = flow.At<Vec2f>(y, x);
+                totalMovement.X += (int)flowAtPoint[0];
+                totalMovement.Y += (int)flowAtPoint[1];
             }
-            if (recognizedText.Contains("Рыба сорвалась"))
+        }
+
+        // Усредняем движение
+        totalMovement.X /= (flow.Rows * flow.Cols);
+        totalMovement.Y /= (flow.Rows * flow.Cols);
+
+        // Добавляем порог, чтобы реагировать только на значительные изменения
+        const int movementThreshold = 1;  // чувствительность
+        if (Math.Abs(totalMovement.X) < movementThreshold) totalMovement.X = 0;
+        if (Math.Abs(totalMovement.Y) < movementThreshold) totalMovement.Y = 0;
+
+        return totalMovement;
+    }
+
+
+    //static System.Drawing.Point CalculateMovement(Mat previousFrame, Mat currentFrame)
+    //{
+    //    // Простой пример: сравнение разницы пикселей по оси X
+    //    Mat grayPrev = new Mat();
+    //    Mat grayCurr = new Mat();
+
+    //    Cv2.CvtColor(previousFrame, grayPrev, ColorConversionCodes.BGR2GRAY);
+    //    Cv2.CvtColor(currentFrame, grayCurr, ColorConversionCodes.BGR2GRAY);
+
+    //    // Используем функцию для поиска смещения
+    //    Mat flow = new Mat();
+    //    Cv2.CalcOpticalFlowFarneback(grayPrev, grayCurr, flow, 0.5, 3, 15, 3, 5, 1.2, 0);
+
+    //    // Усредняем смещение по всему изображению
+    //    System.Drawing.Point movement = new System.Drawing.Point(0, 0);
+    //    for (int y = 0; y < flow.Rows; y++)
+    //    {
+    //        for (int x = 0; x < flow.Cols; x++)
+    //        {
+    //            Vec2f flowAtPoint = flow.At<Vec2f>(y, x);
+    //            movement.X += (int)flowAtPoint[0];
+    //            movement.Y += (int)flowAtPoint[1];
+    //        }
+    //    }
+
+    //    // Нормализуем движение
+    //    movement.X /= flow.Rows * flow.Cols;
+    //    movement.Y /= flow.Rows * flow.Cols;
+
+    //    return movement;
+    //}
+
+
+    //dat
+    static System.Drawing.Point CalculateMovementNight(Mat previousFrame, Mat currentFrame)
+    {
+        // Преобразуем в серый цвет
+        Mat grayPrev = new Mat();
+        Mat grayCurr = new Mat();
+        Cv2.CvtColor(previousFrame, grayPrev, ColorConversionCodes.BGR2GRAY);
+        Cv2.CvtColor(currentFrame, grayCurr, ColorConversionCodes.BGR2GRAY);
+
+        // Используем функцию для поиска смещения с настройками для повышения чувствительности
+        Mat flow = new Mat();
+        Cv2.CalcOpticalFlowFarneback(
+            grayPrev,
+            grayCurr,
+            flow,
+            0.3,  // уменьшаем масштаб пирамиды для повышения чувствительности
+            5,    // увеличиваем количество уровней пирамиды
+            15,   // уменьшаем размер окна
+            3,    // количество итераций алгоритма для каждого уровня пирамиды
+            7,    // увеличиваем количество пикселей для усреднения
+            1.5,  // вес усреднения
+            0     // флаги
+        );
+
+        // Усредняем смещение по всему изображению
+        System.Drawing.Point movement = new System.Drawing.Point(0, 0);
+        for (int y = 0; y < flow.Rows; y++)
+        {
+            for (int x = 0; x < flow.Cols; x++)
             {
-                Console.WriteLine("found");
-                Main();
+                Vec2f flowAtPoint = flow.At<Vec2f>(y, x);
+                movement.X += (int)flowAtPoint[0];
+                movement.Y += (int)flowAtPoint[1];
+            }
+        }
+
+        // Нормализуем движение
+        movement.X /= flow.Rows * flow.Cols;
+        movement.Y /= flow.Rows * flow.Cols;
+
+        // Добавляем порог для учета только значительных изменений
+        const int movementThreshold = 1;  // чувствительность
+        if (Math.Abs(movement.X) < movementThreshold) movement.X = 0;
+        if (Math.Abs(movement.Y) < movementThreshold) movement.Y = 0;
+
+        return movement;
+    }
+    static void SaveImage(Mat image, string filename)
+    {
+        image.SaveImage(filename);
+        Console.WriteLine($"saved: {filename}");
+    }
+    static void DisplayMenu(string[] options, int selectedIndex)
+    {
+        for (int i = 0; i < options.Length; i++)
+        {
+            if (i == selectedIndex)
+            {
+                Console.ForegroundColor = ConsoleColor.Blue;
+                Console.WriteLine($"> {options[i]}");
+                Console.ResetColor();
             }
             else
             {
-                Console.WriteLine("not found");
+                Console.WriteLine($"  {options[i]}");
             }
-
-            // Задержка
-            //Thread.Sleep(delayMilliseconds);
-
-            // Освобождение ресурсов
-            screenshotBmp.Dispose();
-        }
-
-
-
-
-
-        static Bitmap CaptureFINISHScreenshot()
-        {
-            int screenWidth = 1920;  // Ваше разрешение экрана
-            int screenHeight = 1080; // Ваше разрешение экрана
-            Bitmap bitmap = new Bitmap(screenWidth, screenHeight);
-            using (Graphics g = Graphics.FromImage(bitmap))
-            {
-                g.CopyFromScreen(0, 0, 0, 0, bitmap.Size);
-            }
-            return bitmap;
-        }
-
-        static string RecognizeText(Bitmap image)
-        {
-            string tessDataPath = @".\testdata"; // Убедитесь, что путь к tessdata указан правильно
-            using var engine = new TesseractEngine(tessDataPath, "rus", EngineMode.Default);
-
-            // Конвертация Bitmap в Pix
-            using var img = ConvertBitmapToPix(image);
-            using var page = engine.Process(img);
-            return page.GetText();
-        }
-
-        static Pix ConvertBitmapToPix(Bitmap bitmap)
-        {
-            // Сохранение Bitmap в поток памяти как изображение BMP
-            using var stream = new MemoryStream();
-            bitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Bmp);
-            stream.Position = 0;
-
-            // Конвертация потока в Pix с помощью Tesseract
-            return Pix.LoadFromMemory(stream.ToArray());
-        }
-
-        static Mat BitmapToMat(Bitmap bitmap)
-        {
-            // Конвертируем Bitmap в OpenCvSharp.Mat
-            return BitmapConverter.ToMat(bitmap);
-        }
-
-    
-
-
-        //static System.Drawing.Point CalculateMovement(Mat previousFrame, Mat currentFrame)
-        //{
-        //    // Простой пример: сравнение разницы пикселей по оси X
-        //    Mat grayPrev = new Mat();
-        //    Mat grayCurr = new Mat();
-
-        //    Cv2.CvtColor(previousFrame, grayPrev, ColorConversionCodes.BGR2GRAY);
-        //    Cv2.CvtColor(currentFrame, grayCurr, ColorConversionCodes.BGR2GRAY);
-
-        //    // Используем функцию для поиска смещения
-        //    Mat flow = new Mat();
-        //    Cv2.CalcOpticalFlowFarneback(grayPrev, grayCurr, flow, 0.5, 3, 15, 3, 5, 1.2, 0);
-
-        //    // Усредняем смещение по всему изображению
-        //    System.Drawing.Point movement = new System.Drawing.Point(0, 0);
-        //    for (int y = 0; y < flow.Rows; y++)
-        //    {
-        //        for (int x = 0; x < flow.Cols; x++)
-        //        {
-        //            Vec2f flowAtPoint = flow.At<Vec2f>(y, x);
-        //            movement.X += (int)flowAtPoint[0];
-        //            movement.Y += (int)flowAtPoint[1];
-        //        }
-        //    }
-
-        //    // Нормализуем движение
-        //    movement.X /= flow.Rows * flow.Cols;
-        //    movement.Y /= flow.Rows * flow.Cols;
-
-        //    return movement;
-        //}
-
-
-        //night mod
-        static System.Drawing.Point CalculateMovement(Mat previousFrame, Mat currentFrame)
-        {
-            // Преобразуем в серый цвет
-            Mat grayPrev = new Mat();
-            Mat grayCurr = new Mat();
-            Cv2.CvtColor(previousFrame, grayPrev, ColorConversionCodes.BGR2GRAY);
-            Cv2.CvtColor(currentFrame, grayCurr, ColorConversionCodes.BGR2GRAY);
-
-            // Применяем выравнивание гистограммы
-            Cv2.EqualizeHist(grayPrev, grayPrev);
-            Cv2.EqualizeHist(grayCurr, grayCurr);
-
-            // Применяем фильтр Гаусса для сглаживания
-            Cv2.GaussianBlur(grayPrev, grayPrev, new OpenCvSharp.Size(5, 5), 0);
-            Cv2.GaussianBlur(grayCurr, grayCurr, new OpenCvSharp.Size(5, 5), 0);
-
-            // Вычисляем оптический поток
-            Mat flow = new Mat();
-            Cv2.CalcOpticalFlowFarneback(grayPrev, grayCurr, flow, 0.5, 3, 15, 3, 7, 1.5, 0);
-
-            // Анализируем смещение центра
-            System.Drawing.Point movement = new System.Drawing.Point(0, 0);
-            for (int y = 0; y < flow.Rows; y++)
-            {
-                for (int x = 0; x < flow.Cols; x++)
-                {
-                    Vec2f flowAtPoint = flow.At<Vec2f>(y, x);
-                    movement.X += (int)flowAtPoint[0];
-                    movement.Y += (int)flowAtPoint[1];
-                }
-            }
-
-            // Нормализуем движение
-            movement.X /= flow.Rows * flow.Cols;
-            movement.Y /= flow.Rows * flow.Cols;
-
-            return movement;
-        }
-
-
-        static void SaveImage(Mat image, string filename)
-        {
-            image.SaveImage(filename);
-            Console.WriteLine($"saved: {filename}");
         }
     }
-}
 
+    static void ExecuteOptionTime(int selectedIndex)
+    {
+        switch (selectedIndex)
+        {
+            case 0:
+                isDay = true;
+                Console.ReadKey();
+                break;
+            case 1:
+                isDay = false;
+                Console.ReadKey();
+                break;
+            case 2:
+                break;
+        }
+    }
+
+    static void ExecuteOptionKindOFish(int selectedIndex)
+    {
+        switch (selectedIndex)
+        {
+            case 0:
+                isHunter = 950;
+                Console.ReadKey();
+                break;
+            case 1:
+                isHunter = 880;
+                Console.ReadKey();
+                break;
+            case 2:
+                break;
+        }
+    }
+
+}
