@@ -14,6 +14,14 @@ public class KeyPresser
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint SendInput(uint nInputs, [MarshalAs(UnmanagedType.LPArray), In] INPUT[] pInputs, int cbSize);
 
+    [DllImport("user32.dll")]
+    private static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, UIntPtr dwExtraInfo);
+
+
+    private const int INPUT_MOUSE = 0;
+    private const int MOUSEEVENTF_LEFTDOWN = 0x02;
+    private const int MOUSEEVENTF_LEFTUP = 0x04;
+
     [StructLayout(LayoutKind.Sequential)]
     private struct INPUT
     {
@@ -222,6 +230,18 @@ public class KeyPresser
 
         SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(INPUT)));
     }
+
+    public void ClickMouse(int x, int y)
+    {
+        // Move the mouse to the specified coordinates
+        SetCursorPos(x, y);
+
+        // Simulate mouse click
+        mouse_event(MOUSEEVENTF_LEFTDOWN | MOUSEEVENTF_LEFTUP, (uint)x, (uint)y, 0, UIntPtr.Zero);
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool SetCursorPos(int X, int Y);
 }
 
 class Program
@@ -235,14 +255,17 @@ class Program
     static bool isDHeld = false;
     static bool isDay = true;
     static int isHunter = 880;
+    static bool take = true;
     int selectedIndex = 0;
     static bool firstTime = true;
+    static KeyPresser presser = new KeyPresser();
 
     static void Main()
     {
         KeyPresser keyPresser = new KeyPresser();
         string[] tine_of_day = { "День", "Ночь" };
         string[] kind_of_fish = { "Хищная", "не хищная" };
+        string[] take_or_leave = { "Забирать", "отпускать" };
         int selectedIndex = 0;
         Console.OutputEncoding = Encoding.UTF8;
         Console.InputEncoding = Encoding.UTF8;
@@ -301,14 +324,44 @@ class Program
 
             } while (key != ConsoleKey.Enter);
 
+            selectedIndex = 0;
+            do
+            {
+                Console.Clear();
+                Console.WriteLine("Забирать или отпускать :");
 
+                DisplayMenu(take_or_leave, selectedIndex);
 
+                key = Console.ReadKey(true).Key;
+
+                switch (key)
+                {
+                    case ConsoleKey.UpArrow:
+                        selectedIndex = (selectedIndex == 0) ? kind_of_fish.Length - 1 : selectedIndex - 1;
+                        break;
+                    case ConsoleKey.DownArrow:
+                        selectedIndex = (selectedIndex == kind_of_fish.Length - 1) ? 0 : selectedIndex + 1;
+                        break;
+                    case ConsoleKey.Enter:
+                        TakeOrLeave(selectedIndex);
+                        break;
+                }
+
+            } while (key != ConsoleKey.Enter);
+
+            Console.Clear();
+
+            Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine("Примечание: бот ловит рыбу 85 секунд, если он не успевает то прекращает тянуть рыбу и ждет нового заброса, если рыба поймана просто ждите и удочка закинеться автоматически");
             Console.WriteLine();
+            Console.ForegroundColor = ConsoleColor.White;
             Console.WriteLine("Нажмите любую кнопку чтоб начать...");
             Console.ReadKey();
             Console.Clear();
-            Console.WriteLine("Бот работает, откройте ГТА и забросьте удочку");
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("Бот работает, откройте ГТА и забросьте удочку, для появления шкалы с зеленой меткой");
+            Console.ForegroundColor = ConsoleColor.White;
+
         }
 
 
@@ -402,30 +455,79 @@ class Program
                 {
                     g.CopyFromScreen(x - width / 2, y - height / 2, 0, 0, currentScreenshot.Size, CopyPixelOperation.SourceCopy);
                 }
+                if (isHunter != 990)
+                {
+                    if (previousScreenshot == null)
+                    {
+                        // Инициализация: сохраняем первый скриншот и пропускаем его из сравнения
+                        previousScreenshot = new Bitmap(currentScreenshot);
+                        Console.WriteLine("First screenshot taken, will not be compared.");
+                    }
+                    else if (ImagesAreDifferent(previousScreenshot, currentScreenshot))
+                    {
+                        Console.WriteLine("Pixel color change detected.");
 
-                if (previousScreenshot == null)
-                {
-                    // Инициализация: сохраняем первый скриншот и пропускаем его из сравнения
-                    previousScreenshot = new Bitmap(currentScreenshot);
-                    Console.WriteLine("First screenshot taken, will not be compared.");
-                }
-                else if (ImagesAreDifferent(previousScreenshot, currentScreenshot))
-                {
-                    Console.WriteLine("Pixel color change detected.");
-                    presser.PressSpace();
-                    Console.Beep();
-                    traaack();
-                    previousScreenshot.Dispose();
-                    previousScreenshot = new Bitmap(currentScreenshot); // Сохраняем текущее состояние как предыдущее
+                        presser.PressSpace();
+                        Console.Beep();
+                        traaack();
+                        previousScreenshot.Dispose();
+                        previousScreenshot = new Bitmap(currentScreenshot); // Сохраняем текущее состояние как предыдущее
+                    }
+                    else
+                    {
+                        Console.WriteLine("No changes detected.");
+                    }
                 }
                 else
                 {
-                    Console.WriteLine("No changes detected.");
+                    if (previousScreenshot == null)
+                    {
+                        // Инициализация: сохраняем первый скриншот и пропускаем его из сравнения
+                        previousScreenshot = new Bitmap(currentScreenshot);
+                        Console.WriteLine("First screenshot taken, will not be compared.");
+                    }
+                    else if (ContainsRedColor(currentScreenshot))
+                    {
+                        Console.WriteLine("Pixel color change detected.");
+
+                        presser.PressSpace();
+                        Console.Beep();
+                        traaack();
+                        previousScreenshot.Dispose();
+                        previousScreenshot = new Bitmap(currentScreenshot); // Сохраняем текущее состояние как предыдущее
+                    }
+                    else
+                    {
+                        Console.WriteLine("No changes detected.");
+                    }
                 }
 
                 Thread.Sleep(1000); // Задержка 1 секунда между проверками
             }
         }
+    }
+
+    private static bool ContainsRedColor(Bitmap bmp)
+    {
+        for (int i = 0; i < bmp.Width; i++)
+        {
+            for (int j = 0; j < bmp.Height; j++)
+            {
+                Color pixelColor = bmp.GetPixel(i, j);
+                if (pixelColor.R > 150 && pixelColor.G < 100 && pixelColor.B < 100)
+                {
+                    return true; // Если найден красный цвет
+                }
+            }
+        }
+        return false; // Красный цвет не найден
+    }
+
+    private static void SaveScreenshot(Bitmap bmp, string filename)
+    {
+        string filepath = Path.Combine(Directory.GetCurrentDirectory(), filename);
+        bmp.Save(filepath, System.Drawing.Imaging.ImageFormat.Png);
+        Console.WriteLine($"Screenshot saved: {filepath}");
     }
 
     private static bool ImagesAreDifferent(Bitmap bmp1, Bitmap bmp2)
@@ -515,7 +617,7 @@ class Program
                     Console.Beep(500, 500);
                 }
 
-                if (stopwatch.Elapsed.TotalSeconds >= 65)
+                if (stopwatch.Elapsed.TotalSeconds >= 40)
                 {
                     checkEND();
                 }
@@ -552,12 +654,28 @@ class Program
         // Поиск текста на скриншоте
         string recognizedText = RecognizeText(screenshotBmp);
 
-        // Проверка наличия текста "Забрать себе"
-        if (recognizedText.Contains("Забрать себе"))
+        if (take)
         {
-            Console.WriteLine("found");
-            Main();
+            if (recognizedText.Contains("Забрать себе"))
+            {
+                Console.WriteLine("found");
+                Main();
+            }
         }
+        else
+        {
+            if (recognizedText.Contains("Отпустить"))
+            {
+                Console.WriteLine("found");
+                presser.ClickMouse(977, 725);
+                presser.ClickMouse(1224, 725);
+                Thread.Sleep(500);
+                Main();
+            }
+        }
+       
+        // Проверка наличия текста "Забрать себе"
+
 
         if (recognizedText.Contains("Рыба сорвалась"))
         {
@@ -707,22 +825,19 @@ class Program
         Cv2.CvtColor(previousFrame, grayPrev, ColorConversionCodes.BGR2GRAY);
         Cv2.CvtColor(currentFrame, grayCurr, ColorConversionCodes.BGR2GRAY);
 
-        // Используем функцию для поиска смещения с настройками для повышения чувствительности
-        Mat flow = new Mat();
-        Cv2.CalcOpticalFlowFarneback(
-            grayPrev,
-            grayCurr,
-            flow,
-            0.3,  // уменьшаем масштаб пирамиды для повышения чувствительности
-            5,    // увеличиваем количество уровней пирамиды
-            15,   // уменьшаем размер окна
-            3,    // количество итераций алгоритма для каждого уровня пирамиды
-            7,    // увеличиваем количество пикселей для усреднения
-            1.5,  // вес усреднения
-            0     // флаги
-        );
+        // Применяем выравнивание гистограммы
+        Cv2.EqualizeHist(grayPrev, grayPrev);
+        Cv2.EqualizeHist(grayCurr, grayCurr);
 
-        // Усредняем смещение по всему изображению
+        // Применяем фильтр Гаусса для сглаживания
+        Cv2.GaussianBlur(grayPrev, grayPrev, new OpenCvSharp.Size(5, 5), 0);
+        Cv2.GaussianBlur(grayCurr, grayCurr, new OpenCvSharp.Size(5, 5), 0);
+
+        // Вычисляем оптический поток
+        Mat flow = new Mat();
+        Cv2.CalcOpticalFlowFarneback(grayPrev, grayCurr, flow, 0.5, 3, 15, 3, 7, 1.5, 0);
+
+        // Анализируем смещение центра
         System.Drawing.Point movement = new System.Drawing.Point(0, 0);
         for (int y = 0; y < flow.Rows; y++)
         {
@@ -737,11 +852,6 @@ class Program
         // Нормализуем движение
         movement.X /= flow.Rows * flow.Cols;
         movement.Y /= flow.Rows * flow.Cols;
-
-        // Добавляем порог для учета только значительных изменений
-        const int movementThreshold = 1;  // чувствительность
-        if (Math.Abs(movement.X) < movementThreshold) movement.X = 0;
-        if (Math.Abs(movement.Y) < movementThreshold) movement.Y = 0;
 
         return movement;
     }
@@ -773,11 +883,9 @@ class Program
         {
             case 0:
                 isDay = true;
-                Console.ReadKey();
                 break;
             case 1:
                 isDay = false;
-                Console.ReadKey();
                 break;
             case 2:
                 break;
@@ -789,12 +897,25 @@ class Program
         switch (selectedIndex)
         {
             case 0:
-                isHunter = 950;
-                Console.ReadKey();
+                isHunter = 990;
                 break;
             case 1:
                 isHunter = 880;
-                Console.ReadKey();
+                break;
+            case 2:
+                break;
+        }
+    }
+
+    static void TakeOrLeave(int selectedIndex)
+    {
+        switch (selectedIndex)
+        {
+            case 0:
+                take = true;
+                break;
+            case 1:
+                take = false;
                 break;
             case 2:
                 break;
